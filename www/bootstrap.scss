@@ -1,0 +1,256 @@
+.loader,
+.loader:before,
+.loader:after {
+  background: #ED8B00;
+  -webkit-animation: load1 1s infinite ease-in-out;
+  animation: load1 1s infinite ease-in-out;
+  width: 1em;
+  height: 4em;
+}
+.loader {
+  color: #ED8B00;
+  text-indent: -9999em;
+  margin: 88px auto;
+  position: relative;
+  font-size: 11px;
+  -webkit-transform: translateZ(0);
+  -ms-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-animation-delay: -0.16s;
+  animation-delay: -0.16s;
+}
+.loader:before,
+.loader:after {
+  position: absolute;
+  top: 0;
+  content: '';
+}
+.loader:before {
+  left: -1.5em;
+  -webkit-animation-delay: -0.32s;
+  animation-delay: -0.32s;
+}
+.loader:after {
+  left: 1.5em;
+}
+@-webkit-keyframes load1 {
+  0%,
+  80%,
+  100% {
+    box-shadow: 0 0;
+    height: 4em;
+  }
+  40% {
+    box-shadow: 0 -2em;
+    height: 5em;
+  }
+}
+@keyframes load1 {
+  0%,
+  80%,
+  100% {
+    box-shadow: 0 0;
+    height: 4em;
+  }
+  40% {
+    box-shadow: 0 -2em;
+    height: 5em;
+  }
+}
+
+
+$prefix: bs- !default; // BS5 CSS variable prefix
+
+
+$tab-nav-bg-color: #009FDF; 
+.your-tab-nav-class {
+  background-color: $tab-nav-bg-color;
+}
+
+
+@font-face {
+        font-family: ProximaNova;
+        src: url("./www/ProximaNova-Bold.otf") format("opentype");
+        font-weight: bold;
+}
+
+@font-face {
+        font-family: ProximaNova;
+        src: url("./www/ProximaNova-Light.otf") format("opentype");
+        font-weight: 300;
+}
+
+
+.proximanova-title {
+  color: white;
+  font-weight: bold;
+  text-transform: uppercase;
+  background-color: #ED8B00;
+  font-size: x-large;
+}
+
+
+
+/* Smaller buttons */
+.dt-buttons.btn-group button {
+  font-size: 9px;
+}
+
+
+/* Smaller font size */
+.dataTable th,
+.dataTable td {
+  font-size: 10px;
+}
+
+/* Smaller buttons */
+.dt-button {
+  font-size: 10px;
+  padding: 4px 8px;
+}
+
+
+/* Smaller buttons for UMAP controls and app run */
+.btn {
+  font-size: 10px;
+  padding: 4px 8px;
+}
+
+.form-control, .selectize-input {
+  font-size: 10px;
+  height: 27px;
+  padding: 4px 18px;
+}
+
+
+/* Shrink the main select box */
+.selectize-input {
+  font-size: 10px !important;
+  height: 27px !important;
+  padding: 4px 20px !important;
+  min-height: 27px !important;
+  line-height: 1.0 !important;
+}
+
+/* Shrink the dropdown menu */
+.selectize-dropdown {
+  font-size: 10px !important;
+  min-height: 27px !important;
+  padding: 4px !important;
+}
+
+/* Reduce padding and spacing inside dropdown items */
+.selectize-dropdown .option {
+  font-size: 10px !important;
+  padding: 4px 20px !important;
+  height: 27px !important;
+  line-height: 1.0 !important;
+}
+
+/* Standard Bootstrap dropdown (e.g., actionButton dropdowns) */
+.dropdown-menu {
+  font-size: 10px !important;
+  min-width: auto !important;
+  padding: 4px !important;
+}
+
+/* Reduce dropdown item height */
+.dropdown-item {
+  font-size: 10px !important;
+  padding: 4px 20px !important;
+  height: 27px !important;
+  line-height: 1.0 !important;
+}
+
+/* Reduce margin between labels and dropdowns */
+.form-group {
+  margin-bottom: 0px !important;  /* Reduce spacing */
+  margin-top: 0px !important;   
+}
+
+/* Target specific selectInput() label */
+.control-label {
+  margin-bottom: 0px !important;  /* Shrinks space below label */
+  margin-top: 0px !important;
+  font-size: 10px !important;     /* Optional: Make the label smaller */
+}
+
+
+
+
+#plotButton {
+  background-color: #ED8B00 !important; /* Change the background color */
+  color: white !important; /* Change the text color #75787B #ED8B00 */
+  border-color: #ED8B00 !important; /* Change the border color */
+}
+
+#predictBtn {
+  background-color: #ED8B00 !important; /* Change the background color */
+  color: white !important; /* Change the text color #75787B #ED8B00 */
+  border-color: #ED8B00 !important; /* Change the border color */
+}
+
+
+
+
+
+
+
+
+// For BS3, which doesn't have these Sass variables (but has other, similar ones)
+$brand-info: #ED8B00 !default;
+$border-width: 2px !default;
+$border-radius: $border-radius-base !default;
+$border-color: mix($body-bg, $text-color, 70%) !default;
+$primary: $brand-primary !default;
+$info: $brand-info !default;
+$warning: $brand-warning !default;
+$danger: $brand-danger !default;
+ 
+
+// No rgb CSS vars available in BS3-4
+$primary-rgb: var(--#{$prefix}primary-rgb, red($primary),green($primary),blue($primary)) !default;
+$info-rgb:    var(--#{$prefix}info-rgb, red($info), green($info), blue($info)) !default;
+$warning-rgb: var(--#{$prefix}warning-rgb, red($warning), green($warning), blue($warning)) !default;
+$danger-rgb:  var(--#{$prefix}danger-rgb, red($danger), green($danger), blue($danger)) !default;
+
+
+$shiny-emphasis-color-rgb:          var(--#{$prefix}emphasis-color-rgb, 0,0,0) !default;
+$shiny-disconnected-bg:             RGBA($shiny-emphasis-color-rgb, 0.42) !default;
+$shiny-table-na:                    RGBA($shiny-emphasis-color-rgb, 0.46) !default;
+$shiny-error-validated-color:       RGBA($shiny-emphasis-color-rgb, 0.5) !default;
+$shiny-progress-text-bg-color:      RGBA($primary-rgb, 2.5) !default;
+$shiny-input-panel-bg:              RGBA($shiny-emphasis-color-rgb, 0.04) !default;
+$shiny-input-panel-border:          $border-width solid var(--#{$prefix}border-color, $border-color) !default;
+$shiny-input-panel-border-radius:   $border-radius !default;
+$shiny-text-output-border-radius:   $border-radius !default;
+$notification-bg-color:             RGBA($shiny-emphasis-color-rgb, 0.05) !default;
+$notification-color:                $shiny-emphasis-color-rgb !default;
+$notification-border:               $border-width solid var(--#{$prefix}border-color, $border-color) !default;
+$notification-border-radius:        $border-radius !default;
+$notification-message-bg:           RGBA($info-rgb, 0.05) !default;
+$notification-message-color:        RGBA($info-rgb, 1) !default;
+$notification-message-border:       $border-width solid RGBA($info-rgb, 0.5) !default;
+$notification-warning-bg:           RGBA($warning-rgb, 0.05) !default;
+$notification-warning-color:        RGBA($warning-rgb, 0.9) !default;
+$notification-warning-border:       $border-width solid RGBA($warning-rgb, 0.3) !default;
+$notification-error-bg:             RGBA($danger-rgb, 0.05) !default;
+$notification-error-color:          RGBA($danger-rgb, 0.9) !default;
+$notification-error-border:         $border-width solid RGBA($warning-rgb, 0.2) !default;
+$notification-close-color:          RGBA($shiny-emphasis-color-rgb, 0.8) !default;
+$notification-close-hover-color:    RGB($shiny-emphasis-color-rgb) !default;
+$notification-content-action-color: RGB($primary-rgb) !default;
+$datepicker-disabled-color:         $dropdown-link-disabled-color !default;
+
+
+h5 {
+  font-size: 11px; /* Adjust the font size as needed */
+}
+
+// I don't think BS3 has a file input box shadow setting
+@if variable-exists('custom-file-focus-box-shadow') {
+  $shiny-file-active-shadow: $custom-file-focus-box-shadow !default;
+}
+
+// TODO: should this be changed to danger?
+//$shiny-error-color:        red !default;

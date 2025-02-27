@@ -1,0 +1,446 @@
+---
+title: '`r paste(" <h1 style=\"font-size: 24px;\"> ![Australian Microbiobiome](agrflogo.png){width=30%}   Australian MicrobialLandScape report.  </h1>")`'
+date: '`r paste("<h1 style=\"font-size: 14px; color: lightgrey;\">Created on: ", Sys.Date(), "</h1>")`'
+output: html_document
+params:
+  sample_id: "default"
+fontsize: 8pt
+---
+
+```{r setup, include=FALSE, echo=FALSE,error=TRUE,message=TRUE,warning=TRUE}
+library(flexdashboard)
+library(RColorBrewer) 
+library(jsonlite)
+library(knitr)
+library(kableExtra)
+library(formattable)
+library(dplyr)
+library(vegan)
+library(uwot)
+library(plotly)
+library(d3r)
+library(sunburstR)
+library(DT)
+library(leaflet)
+
+
+print(paste("Sample ID passed:", params$sample_id));
+mysample      <- params$sample_id;
+mypredictions <- readRDS(mypredictions_tmpfile);
+otusami       <- amidataset;
+umap.res      <- umap_data_ami;
+
+#otusami  <- readRDS("rfm_files\\meta_with_otus_ozcontinent_3202x8128.rds");
+#mycolors <- readRDS("www\\mycolors.rds");
+#mysample <- "X44F.OL30R3_FitzroyOil30R3"
+#twotab   <- readRDS("twotab.rds")
+#rmarkdown::render("umap_2_html.Rmd", params = list(mysample = "X12560.1"))
+```
+
+```{r prep bars on the first tab,  echo=FALSE,error=TRUE,message=TRUE,warning=TRUE}
+mysampleph     <- "error: no mysampleph!";
+samplerofile   <- twotab[twotab$ids == mysample, -c(1:5)];    ## slice one sample row
+non_zero_taxa  <- samplerofile[, colSums(samplerofile) > 0];  ## slice populated cols
+mysampleotus   <- length(non_zero_taxa);
+mysamplealpha  <- diversity(samplerofile, index = "shannon");
+mysampleph     <- mypredictions[which(mypredictions$Sample == mysample), "ph"];  
+
+
+# Calculate quartiles for OTUs and Shannon Index
+otu_values <- otusami$Detected_OTUs
+shannon_values <- otusami$Shannon_Index
+
+otu_q1 <- quantile(otu_values, 0.25)
+otu_q3 <- quantile(otu_values, 0.75)
+otu_min <- min(otu_values)
+otu_max <- max(otu_values)
+
+shannon_q1 <- quantile(shannon_values, 0.25)
+shannon_q3 <- quantile(shannon_values, 0.75)
+shannon_min <- min(shannon_values)
+shannon_max <- max(shannon_values)
+
+# Function to create segmented bar plot
+create_segmented_bar <- function(q1, q3, min_val, max_val, sample_value, label) {
+  ggplot() +
+    geom_rect(aes(xmin = min_val, xmax = q1, ymin = 0, ymax = 1), fill = "pink") +
+    geom_rect(aes(xmin = q1, xmax = q3, ymin = 0, ymax = 1), fill = "green") +
+    geom_rect(aes(xmin = q3, xmax = max_val, ymin = 0, ymax = 1), fill = "pink") +
+    geom_segment(aes(x = sample_value, xend = sample_value, y = 0, yend = 1), color = "blue", size = 2) +
+    annotate("text", x = sample_value, y = 1.05, label = label, color = "blue", size = 8, vjust = 0) +
+    theme_void() +
+    coord_cartesian(xlim = c(min_val, max_val), ylim = c(0, 1.5)) +
+    theme(aspect.ratio = 0.05, plot.margin = margin(0.1, 0.1, 0.1, 0.1)) 
+}
+
+# OTU bar
+otu_bar <- create_segmented_bar(otu_q1, otu_q3, otu_min, otu_max, mysampleotus, mysampleotus)
+
+# Shannon Index bar
+shannon_bar <- create_segmented_bar(shannon_q1, shannon_q3, shannon_min, shannon_max, mysamplealpha, round(mysamplealpha, 1))
+
+
+TOP3MVG <- "Not found";
+environment1stcol = 12    ## columns order depend on model list this start of classifiers for the environment 
+sample_scores <- as.numeric(mypredictions[mypredictions$Sample == mysample, environment1stcol:ncol(mypredictions)])
+top3_indices  <- order(-sample_scores)[1:3]
+top3_names    <- colnames(mypredictions)[(environment1stcol-1) + top3_indices]  
+top3_scores   <- sample_scores[top3_indices]
+top3_df       <- data.frame(Feature = top3_names, MyScore = top3_scores)
+
+top3_df$MyScore <- color_bar("orange")(top3_df$MyScore)
+TOP3MVG <- kbl(top3_df, col.names = c("", ""), align = c("l", "l"), escape = FALSE) %>%
+  kable_paper("hover", full_width = FALSE) %>%
+  column_spec(2, width = "6cm") ;
+```
+
+```{r ami best friends, echo=FALSE,error=TRUE,message=FALSE,warning=FALSE}
+
+mytab <- filtered_twotab <- twotab[
+  twotab$sample_id != "TestBatch" | twotab$ids == mysample,
+]
+
+mytab <- filtered_twotab <- twotab[
+  twotab$sample_id != "TestBatch" | twotab$ids == mysample,
+]
+
+# Step 1: Prepare the profile data (presence/absence matrix)
+profiles <- mytab[, 6:ncol(mytab)]
+profiles[is.na(profiles)] <- 0
+profiles_binary <- ifelse(profiles > 0, 1, 0)  # Convert to presence/absence (binary)
+profiles_sparse <- Matrix(as.matrix(profiles_binary), sparse = TRUE)
+# Custom Jaccard distance function as the original is deadly slow
+jaccard_sparse  <- function(sparse_matrix, row_idx) {
+  row <- sparse_matrix[row_idx, ]
+  similarity <- apply(sparse_matrix, 1, function(x) {
+    intersection <- sum(row * x)  # Number of shared presences
+    union <- sum(row + x > 0)     # Total presences across both
+    1 - (intersection / union)    # Jaccard distance
+  })
+  similarity
+}
+mysample_idx    <- which(mytab$ids == mysample)
+jaccard_dist    <- jaccard_sparse(profiles_sparse, mysample_idx)
+top_10_indices  <- order(jaccard_dist)[1:11]       # Include mysample itself
+top_10_metadata <- mytab[top_10_indices, 1:5]      # Extract metadata for top matches
+
+# Step 5: Visualization of metadata (e.g., bar plot for a categorical variable)
+top_10_metadata <- top_10_metadata %>%
+  mutate(Similarity = 1 - jaccard_dist[top_10_indices],  # Convert to similarity
+         Rank = row_number())                      # Add rank for plot
+
+top_10df <- top_10_metadata[-1, -c(1,7)]
+
+top_10df$Similarity      <- color_bar("#009FDF")(top_10df$Similarity)
+top_10df$MVG_NAME.extant <- color_tile("cornsilk", "#ED8800")(factor(top_10df$MVG_NAME.extant))
+
+TOP10JACCARD <- kbl(top_10df, row.names = FALSE,
+                    align = c("l", "r", "r", "r"), 
+                    escape = FALSE) %>%
+  kable_paper("hover", full_width = FALSE) %>%
+  column_spec(5, width = "6cm") 
+
+
+## top10 on the Australian map ##################################
+
+ OZMAP <- leaflet() %>%
+              addTiles() %>%
+               setView(lng = top_10_metadata$longitude[1], 
+                       lat = top_10_metadata$latitude[1],
+                       zoom = 4.5)%>%
+#              setView(lng = 133.775, lat = -25.2744, zoom = 4) %>%
+              addMarkers(
+                lng = as.numeric(top_10_metadata$longitude[1]),
+                lat = as.numeric(top_10_metadata$latitude[1]),
+                popup = paste("<b>predicted location for:</b><br>", mysample)
+              ) %>%
+              addCircleMarkers(
+                data = top_10df,
+                lng = ~longitude,
+                lat = ~latitude,
+                popup = paste(
+                  "<b>Sample ID:</b> ",   top_10df$sample_id, "<br>",
+                  "<b>Environment:</b> ", top_10df$MVG_NAME.extant,
+                  "<b>Similarity:</b> ",  top_10df$Similarity
+                ),
+                radius = 6,              # Adjust the radius size as needed
+                fillColor = "burlywood",  # Inside circle "#009FDF",
+                color = "#ED8800",       # Choose a color for the circle markers "#0090b0"
+                stroke = TRUE,           # Border on circles
+                fillOpacity = 0.5        # Adjust opacity
+              )
+
+
+```
+
+```{r suburst dataprep,  echo=FALSE,error=TRUE,message=FALSE,warning=FALSE}
+# Split taxonomy levels, ensuring each list element has 7 levels
+tax_levels <- strsplit(colnames(non_zero_taxa), "_[pcofgs]__", perl = TRUE)
+tax_levels_padded <- lapply(tax_levels, function(x) {
+  length(x) <- 7  # Pad each element to 7 levels
+  x
+})
+
+# Create a data frame for taxonomy and add frequencies
+taxonomy_df            <- data.frame(matrix(unlist(tax_levels_padded), ncol = 7, byrow = TRUE))
+colnames(taxonomy_df)  <- c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species")
+taxonomy_df$Frequency  <- as.numeric(unlist(non_zero_taxa))  # Add frequencies from sample profile
+taxonomy_df$size       <- round((taxonomy_df$Frequency * 100), 0);
+taxonomy_df[is.na(taxonomy_df)] <- "unknown";
+
+toptaxonomies <- taxonomy_df %>%
+  arrange(desc(Frequency)) %>%
+  head(10);
+
+low_abundant_freq <- 1 - sum(toptaxonomies$Frequency)
+if (low_abundant_freq < 0) stop("Top 10 taxonomies exceed total proportion.")
+toptaxonomies <- rbind(toptaxonomies,  data.frame(
+      Domain    = "Bacteria",         
+      Phylum    = "other",            
+      Class     = "other",            
+      Order     = "other",      
+      Family    = "other",     
+      Genus     = "other",     
+      Species   = "other",    
+      Frequency = low_abundant_freq,	
+      size = round(low_abundant_freq * 100, 0)
+     )                   
+ );
+toptaxonomies[] <- lapply(toptaxonomies, function(x) sub("_+$", "", x))
+
+unique_taxa <- unique(unlist(toptaxonomies[, 1:7]));
+palette     <- colorRampPalette(brewer.pal(7, "Set3"))(length(unique_taxa));
+taxa_colors <- setNames(palette, unique_taxa);
+taxa_colors["other"]          <- "#cacfd2";  # "non_abundant"] ## not picjing anyway
+
+
+# Generate the tree
+tree <- d3_nest(
+  toptaxonomies[, c("Phylum", "Class", "Order", "Family", "Genus", "Species", "size")],
+  value_cols = "size"
+)
+
+
+# Sunburst plot with a custom color function
+SUNBURST <- sund2b(
+  tree,
+  rootLabel = "Bacteria",
+  width = "100%",
+  colors = list(range = as.vector(taxa_colors))
+#   htmlwidgets::JS(  "function(name, d){return d.color || '#ccc';}" ) 
+  
+) 
+
+
+# Generate top 10 table
+TOP10TBL <- datatable(
+  toptaxonomies[ , -c(1, 8)],
+  options = list(
+    rownames = FALSE,
+    paging = FALSE,  # Disable pagination
+    dom = 't'        # Table only ('t')
+  )
+)
+
+
+
+
+TOP10TBL <- datatable(
+  toptaxonomies[ , -c(1,8)],
+  options = list(
+    rownames = FALSE,
+    paging = FALSE,  # Disable pagination
+    dom = 't'        # table only 't'
+  )
+)
+
+```
+
+
+```{r umap dataprep,  echo=FALSE,error=TRUE,message=FALSE,warning=FALSE}
+#
+#	mycolors["Coastal water"] = "aquamarine";      ## 1505
+#	mycolors["Coral"]         = "coral1";          ##  431
+#	mycolors["Fresh water"]   = "cyan";            ##    6
+#	mycolors["Pelagic"]       = "blue";            ## 3785
+#	mycolors["Seagrass"]      = "darkgreen";       ##  165
+#	mycolors["Seaweed"]       = "darkolivegreen1"; ##  216
+#	mycolors["Sediment"]      = "cadetblue";       ##  405
+#	mycolors["Soil"]          = "firebrick";       ## 3482
+#	mycolors["Sponge"]        = "darkmagenta";     ##  215
+#	mycolors["Surface water"] = "cadetblue1";      ##  405
+#	mycolors["Terrestrial plant"]= "chartreuse";   ##  187 
+ 
+if(length(setdiff(unique(umap.res$Environment), names(mycolors)))>0){
+  newcols <- rainbow(length(setdiff(unique(umap.res$Environment), names(mycolors))), alpha=0.7, start=runif(n=1, min=0.1, max=.9));
+  names(newcols) <- setdiff(unique(umap.res$Environment), names(mycolors));
+  mycolors <-c(mycolors,newcols);
+};
+
+unmatched_colors <- setdiff(unique(umap.res$Environment), names(mycolors))
+if (length(unmatched_colors) > 0) {
+  print(paste("Unmatched colors for:", paste(unmatched_colors, collapse=", ")))
+}
+
+umap.res$umap_x <- round(as.numeric(umap.res$umap_x), 4);
+umap.res$umap_y <- round(as.numeric(umap.res$umap_y), 4);
+umap.res$Study  <- "ami";
+umap.res$Study[!umap.res$sample_id %in% otusami$sample_id] <- "agrf";
+metarow  <- subset(umap.res, ids == mysample);
+
+
+
+m <- highlight_key(umap.res)
+
+pumap <- ggplot(m, aes(x = umap_x, y = umap_y, 
+                       text = paste("Sample ID:", sample_id, "<br>", Environment))) +  
+  geom_point(aes(color = Environment), size = 2) + 
+  theme_minimal() +
+  scale_color_manual("Environment", 
+                     values = mycolors[sort(names(mycolors))], 
+                     guide = guide_legend(override.aes = list(shape = 19))) +
+  labs(title = "UMAP Embedding Colored by Environment", x = "UMAP X", y = "UMAP Y")
+
+# Convert to a plotly object with tooltip set to display both sample_id and Environment
+gg <- ggplotly(pumap, tooltip = "text") %>%
+  layout(legend = list(title = list(text = "Environment"))) %>%
+  highlight("plotly_selected", off = "plotly_relayout")
+
+# Create interactive table and combine with the UMAP plot
+UTABLE <- crosstalk::bscols(list(
+  gg %>%
+    add_annotations(
+      x = metarow$umap_x,
+      y = metarow$umap_y,
+      text = metarow$ids,
+      showarrow = TRUE,
+      arrowcolor = 'navy',
+      arrowhead = 6,
+      arrowsize = 2,
+      xref = "x",
+      yref = "y",
+      font = list(color = 'navy', family = 'arial', size = 16)
+    ),
+  DT::datatable(
+    m, rownames = TRUE, 
+    extensions = 'Buttons',
+    options = list(
+      autoWidth = FALSE,
+      scrollY = TRUE, 
+      scrollX = TRUE,
+      columnDefs = list(list(visible = FALSE, targets = c(1, 3,4, 6))),
+      paging = TRUE,
+      searching = TRUE,
+      fixedColumns = TRUE,
+      ordering = TRUE,
+      dom = 'Blfrtip',
+      buttons = c('colvis', 'copy', 'csv', 'excel')
+    )
+  ) %>%
+    DT::formatStyle(columns = c(1, 2), fontSize = '75%')
+))
+
+
+```
+
+
+
+Sample: `r paste( mysample)` {.tabset}
+--------------------------------------------------------------------------------
+###  Stats n Numbers
+
+Sample metrics in comparison to Australian Microbiome Initiative (AMI) soil dataset. The green area is covering 50% of Australian soil samples. The pink bars are lower and upper 25% of soil specimens collected across Australian continent by AMI.
+
+--------------------------------------------------------------------------------
+
+##### `r paste("Species (OTUs) detected: ", mysampleotus )`
+
+```{r otu bar,  fig.width=20, fig.height=1, dpi=300, fig.align='right', echo=FALSE}
+  otu_bar; 
+```
+
+-------------------
+
+##### `r paste("Alpha diversity (Shannons): ", round(mysamplealpha,1) )`
+
+```{r shannon bar, fig.width=20, fig.height=1, dpi=96, fig.align='right', echo=FALSE}
+ shannon_bar; 
+```
+
+-------------------
+
+##### Top 3 predicted environment
+
+
+```{r print_top3mvg, echo=FALSE}
+
+TOP3MVG
+
+```
+
+-------------------
+
+##### `r paste("Predicted soil pH: ", mysampleph )`
+
+
+###  Top 10 taxonomies
+
+Sunburst plot of ten the most abundant bacteria species. 
+
+
+```{r sampletax plot, fig.width=7, fig.height=7, dpi=72, fig.align='center', echo=FALSE, error=TRUE, message=TRUE, warning=FALSE}
+
+
+ SUNBURST
+
+```
+
+Table with taxonomies for the top 10 most abundant species.the last column `size` is rounded percentage of  the bacteria in relation to the entire sample set `(100%)`.
+
+```{r top10 taxatable, echo=FALSE, error=TRUE, message=TRUE, warning=FALSE}
+ 
+TOP10TBL
+ 
+```
+
+
+--------------------------------------------------------------------------------
+
+### AMI best 10 
+
+
+##### `r paste("Top 10 AMI Samples Similar to", mysample, " based on Jaccard index" )`
+
+```{r table with top 10 AMI, dpi=72, fig.align='center', echo=FALSE, error=TRUE, message=TRUE, warning=FALSE}
+
+TOP10JACCARD
+
+```
+
+
+---------------------
+
+
+```{r ozmap plot, fig.width=10, fig.height=3, fig.align='center', echo=FALSE, error=TRUE, message=TRUE, warning=FALSE}
+
+
+ OZMAP
+
+```
+
+
+
+
+
+--------------------------------------------------------------------------------
+### UMAP with AMI 
+
+Dimensionality reduction performed on the soil bacterial profiles acquired from Australian Microbiome Initiative  [website](https://data.bioplatforms.com/bpa/otu/) and merged with the uploaded batch data set.  
+UMAP function was applied to the combined species count matrix. The figure is interactive and allows you to navigate in to selected area. The rectangular and lasso selection tool from the right top corner are  connected with the table below figure. Selection dots on the UMAP plot will automatically filter rows in the table.  
+
+```{r umap plot, echo=FALSE, error=TRUE, message=TRUE, warning=FALSE}
+
+ UTABLE
+
+```
+
